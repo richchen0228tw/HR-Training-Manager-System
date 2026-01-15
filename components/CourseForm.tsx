@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { Course } from '../types';
+
+import React, { useState, useEffect, useMemo } from 'react';
+import { Course, COMPANY_OPTIONS, DEPARTMENT_MAPPING, User } from '../types';
 
 interface CourseFormProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (course: Course) => void;
   initialData?: Course | null;
+  currentUser: User;
 }
 
 const emptyCourse: Course = {
@@ -29,27 +31,38 @@ const emptyCourse: Course = {
   createdBy: 'HR'
 };
 
-const COMPANY_OPTIONS = ['神通', '神資', '神耀', '新達', '肇源', '光通信'];
-
-const DEPARTMENT_MAPPING: Record<string, string[]> = {
-  '神資': [
-    '070-董事長室', 'P00-總經理室', 'PA0-財務處', 'PC0-稽核室', 
-    'PG0-資訊服務研發處', '600-數位科技事業群', '700-行政支援中心', 
-    'C00-應用系統事業群', 'G00-創新科技事業群', 'K00-智慧交通事業群'
-  ],
-  '神耀': [
-    'Q0A-董事長室', 'Q00-總經理室', 'QF0-管理處', 'Q01-財會部', 
-    'QA0-智能科技中心', 'QB0-智慧聯安事業群', 'QC0-AI創新應用研發中心'
-  ],
-  '新達': [
-    'ZA0-董事長室', 'Z00-總經理室', 'Z10-統合通訊處', 
-    'Z20-智能影音處', 'Z30-電力系統處', 'Z70-技術支援處'
-  ]
-};
-
-export const CourseForm: React.FC<CourseFormProps> = ({ isOpen, onClose, onSubmit, initialData }) => {
+export const CourseForm: React.FC<CourseFormProps> = ({ isOpen, onClose, onSubmit, initialData, currentUser }) => {
   const [formData, setFormData] = useState<Course>(emptyCourse);
   const [availableDepartments, setAvailableDepartments] = useState<string[]>([]);
+
+  // 1. Calculate valid companies based on user permissions
+  const validCompanies = useMemo(() => {
+    if (currentUser.role === 'SystemAdmin') {
+      return COMPANY_OPTIONS;
+    }
+    // Filter global options to keep order, but restrict to user permissions
+    return COMPANY_OPTIONS.filter(opt => 
+      currentUser.permissions.some(p => p.company === opt)
+    );
+  }, [currentUser]);
+
+  // Helper to get allowed departments for a specific company based on user role
+  const getAllowedDepartments = (companyName: string): string[] => {
+    const allDepts = DEPARTMENT_MAPPING[companyName] || [];
+    
+    if (currentUser.role === 'SystemAdmin') {
+      return allDepts;
+    }
+
+    const permission = currentUser.permissions.find(p => p.company === companyName);
+    if (!permission) return [];
+
+    if (permission.viewAllDepartments) {
+      return allDepts;
+    }
+    
+    return permission.allowedDepartments;
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -59,21 +72,29 @@ export const CourseForm: React.FC<CourseFormProps> = ({ isOpen, onClose, onSubmi
             ...initialData,
             cancellationReason: initialData.cancellationReason || ''
         });
+        // Load allowed departments for the existing company
         if (initialData.company) {
-             setAvailableDepartments(DEPARTMENT_MAPPING[initialData.company] || []);
+             setAvailableDepartments(getAllowedDepartments(initialData.company));
         }
       } else {
-        setFormData({ ...emptyCourse, id: crypto.randomUUID() });
+        // Creating new course: Set createdBy based on current user role
+        // If GeneralUser -> 'User', else (HR/Admin) -> 'HR'
+        setFormData({ 
+            ...emptyCourse, 
+            id: crypto.randomUUID(),
+            createdBy: currentUser.role === 'GeneralUser' ? 'User' : 'HR'
+        });
         setAvailableDepartments([]);
       }
     }
-  }, [isOpen, initialData]);
+  }, [isOpen, initialData, currentUser]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     
     if (name === 'company') {
-        const newDepts = DEPARTMENT_MAPPING[value] || [];
+        // Use the permission-aware helper instead of raw DEPARTMENT_MAPPING
+        const newDepts = getAllowedDepartments(value);
         setAvailableDepartments(newDepts);
         setFormData(prev => ({
             ...prev,
@@ -96,7 +117,8 @@ export const CourseForm: React.FC<CourseFormProps> = ({ isOpen, onClose, onSubmi
 
   if (!isOpen) return null;
 
-  const inputClass = "w-full rounded-lg border-slate-200 border p-2 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-colors";
+  // Updated input class with light yellow background and DARK BORDER (slate-600)
+  const inputClass = "w-full rounded-lg border-slate-600 border p-2 bg-yellow-50 focus:bg-white focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-colors";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
@@ -139,10 +161,13 @@ export const CourseForm: React.FC<CourseFormProps> = ({ isOpen, onClose, onSubmi
                 className={inputClass}
              >
                  <option value="" disabled>請選擇公司</option>
-                 {COMPANY_OPTIONS.map(opt => (
+                 {validCompanies.map(opt => (
                      <option key={opt} value={opt}>{opt}</option>
                  ))}
              </select>
+             {validCompanies.length === 0 && (
+               <p className="text-xs text-red-500 mt-1">您目前沒有任何公司的建立權限</p>
+             )}
           </div>
 
           <div>
@@ -152,9 +177,11 @@ export const CourseForm: React.FC<CourseFormProps> = ({ isOpen, onClose, onSubmi
                 value={formData.department}
                 onChange={handleChange}
                 className={inputClass}
-                disabled={availableDepartments.length === 0}
+                disabled={!formData.company || availableDepartments.length === 0}
              >
-                 <option value="">{availableDepartments.length > 0 ? '請選擇部門' : '無對應部門'}</option>
+                 <option value="">
+                    {availableDepartments.length > 0 ? '請選擇部門' : (formData.company ? '無可選部門權限' : '請先選擇公司')}
+                 </option>
                  {availableDepartments.map(opt => (
                      <option key={opt} value={opt}>{opt}</option>
                  ))}
@@ -325,6 +352,8 @@ export const CourseForm: React.FC<CourseFormProps> = ({ isOpen, onClose, onSubmi
               value={formData.createdBy}
               onChange={handleChange}
               className={inputClass}
+              // If GeneralUser, prevent changing this field to HR manually
+              disabled={currentUser.role === 'GeneralUser'}
             >
                 <option value="HR">HR</option>
                 <option value="User">員工 (User)</option>
@@ -341,7 +370,7 @@ export const CourseForm: React.FC<CourseFormProps> = ({ isOpen, onClose, onSubmi
                 value={formData.cancellationReason || ''}
                 onChange={handleChange}
                 placeholder="請輸入取消原因..."
-                className={`${inputClass} border-red-200 bg-red-50 focus:ring-red-500`}
+                className={`${inputClass} border-red-500 bg-red-50 focus:ring-red-500`}
               />
             </div>
           )}

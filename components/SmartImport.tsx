@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { parseTrainingDataWithGemini } from '../services/geminiService';
 import { Course } from '../types';
@@ -49,7 +50,7 @@ export const SmartImport: React.FC<SmartImportProps> = ({ onImport, onCancel }) 
 
         <div className="p-6">
           <textarea
-            className="w-full h-48 p-4 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none resize-none transition-all text-sm"
+            className="w-full h-48 p-4 rounded-xl border border-slate-600 bg-yellow-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none resize-none transition-all text-sm"
             placeholder="例如：&#10;下個月要舉辦兩場訓練：&#10;1. React 進階實戰，11/20 早上九點到下午五點，講師是王大明，預計30人，費用2萬元。&#10;2. 職場溝通術，11/25 下午場，張經理主講，不用費用。"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}

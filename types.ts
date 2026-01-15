@@ -1,3 +1,4 @@
+
 export interface Course {
   id: string;
   name: string; // 課程名稱
@@ -31,4 +32,49 @@ export interface DashboardStats {
   participationRate: number; // 參訓率
 }
 
-export type ViewState = 'dashboard' | 'list' | 'import';
+// User & Permission Types
+export type UserRole = 'SystemAdmin' | 'HR' | 'GeneralUser';
+
+export interface CompanyPermission {
+  company: string;
+  viewAllDepartments: boolean; // True: Can view all data for this company
+  allowedDepartments: string[]; // If viewAll is false, only these departments
+}
+
+export interface User {
+  id: string;
+  username: string;
+  password?: string; // In real app, store hash. Here plain text for demo.
+  name: string;
+  role: UserRole;
+  permissions: CompanyPermission[];
+  mustChangePassword?: boolean; // Force user to change password on next login
+}
+
+export type ViewState = 'dashboard' | 'list' | 'import' | 'users';
+
+export interface AppSettings {
+  googleScriptUrl: string;
+}
+
+// Constants shared across components
+export const COMPANY_OPTIONS = ['神通', '神資', '神耀', '新達', '肇源', '光通信'];
+
+export const DEPARTMENT_MAPPING: Record<string, string[]> = {
+  '神資': [
+    '070-董事長室', 'P00-總經理室', 'PA0-財務處', 'PC0-稽核室', 
+    'PG0-資訊服務研發處', '600-數位科技事業群', '700-行政支援中心', 
+    'C00-應用系統事業群', 'G00-創新科技事業群', 'K00-智慧交通事業群'
+  ],
+  '神耀': [
+    'Q0A-董事長室', 'Q00-總經理室', 'QF0-管理處', 'Q01-財會部', 
+    'QA0-智能科技中心', 'QB0-智慧聯安事業群', 'QC0-AI創新應用研發中心'
+  ],
+  '新達': [
+    'ZA0-董事長室', 'Z00-總經理室', 'Z10-統合通訊處', 
+    'Z20-智能影音處', 'Z30-電力系統處', 'Z70-技術支援處'
+  ],
+  '神通': ['一般部門'],
+  '肇源': ['一般部門'],
+  '光通信': ['一般部門']
+};

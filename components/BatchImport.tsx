@@ -1,16 +1,18 @@
+
 import React, { useState, useRef } from 'react';
-import { Course } from '../types';
+import { Course, User } from '../types';
 
 interface BatchImportProps {
   onImport: (courses: Course[]) => void;
   onCancel: () => void;
+  currentUser: User;
 }
 
 // Helper to provide a template
 const CSV_HEADER = "課程名稱,公司別,部門/單位,課程目的,開始日期,結束日期,時間,時數,預計人數,講師,講師單位,費用";
 const SAMPLE_DATA = "Excel進階實戰,神資,600-數位科技事業群,提升資料處理效率,2024-01-15,2024-01-15,09:00-17:00,7,30,陳大文,數據中心,12000\n溝通技巧,新達,Z10-統合通訊處,強化跨部門溝通,2024-01-20,2024-01-20,13:30-16:30,3,20,林小美,HR,5000";
 
-export const BatchImport: React.FC<BatchImportProps> = ({ onImport, onCancel }) => {
+export const BatchImport: React.FC<BatchImportProps> = ({ onImport, onCancel, currentUser }) => {
   const [inputText, setInputText] = useState('');
   const [previewData, setPreviewData] = useState<Course[]>([]);
   const [error, setError] = useState('');
@@ -51,6 +53,9 @@ export const BatchImport: React.FC<BatchImportProps> = ({ onImport, onCancel }) 
       // Skip header if user pasted it, simple check if first row contains "課程名稱"
       const startIndex = rows[0].includes('課程名稱') ? 1 : 0;
 
+      // Determine creator role based on current user
+      const createdByValue = currentUser.role === 'GeneralUser' ? 'User' : 'HR';
+
       for (let i = startIndex; i < rows.length; i++) {
         const row = rows[i].trim();
         if (!row) continue;
@@ -79,7 +84,7 @@ export const BatchImport: React.FC<BatchImportProps> = ({ onImport, onCancel }) 
           actualAttendees: 0,
           satisfaction: 0,
           status: 'Planned',
-          createdBy: 'HR'
+          createdBy: createdByValue
         };
         parsedCourses.push(course);
       }
@@ -150,7 +155,7 @@ export const BatchImport: React.FC<BatchImportProps> = ({ onImport, onCancel }) 
 
               <div className="relative">
                 <textarea
-                  className="w-full h-48 p-4 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500 outline-none font-mono text-sm leading-relaxed transition-colors"
+                  className="w-full h-48 p-4 rounded-xl border border-slate-600 bg-yellow-50 focus:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500 outline-none font-mono text-sm leading-relaxed transition-colors"
                   placeholder={`範例格式：\n${SAMPLE_DATA}`}
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
