@@ -21,6 +21,9 @@ const App: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [scriptUrl, setScriptUrl] = useState('');
   
+  // Selection State for Batch Delete
+  const [selectedCourseIds, setSelectedCourseIds] = useState<Set<string>>(new Set());
+
   // Sync Status State
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [isTestingConnection, setIsTestingConnection] = useState(false);
@@ -41,11 +44,40 @@ const App: React.FC = () => {
     loadData();
   }, []);
 
+  // Clear selection when view changes
+  useEffect(() => {
+    setSelectedCourseIds(new Set());
+  }, [view]);
+
   // Filter courses based on logged-in user permissions
   const visibleCourses = useMemo(() => {
       if (!currentUser) return [];
       return getVisibleCourses(courses, currentUser);
   }, [courses, currentUser]);
+
+  // Group Courses by Month for List View
+  const groupedCourses = useMemo(() => {
+      if (view !== 'list') return [];
+      
+      const groups: Record<string, Course[]> = {};
+      
+      visibleCourses.forEach(course => {
+          const monthKey = course.startDate.substring(0, 7); // "YYYY-MM"
+          if (!groups[monthKey]) {
+              groups[monthKey] = [];
+          }
+          groups[monthKey].push(course);
+      });
+
+      // Sort months ascending
+      const sortedMonths = Object.keys(groups).sort();
+
+      return sortedMonths.map(month => ({
+          month,
+          // Sort courses within month by startDate ascending
+          courses: groups[month].sort((a, b) => a.startDate.localeCompare(b.startDate))
+      }));
+  }, [visibleCourses, view]);
 
   const handleLoginSuccess = (user: User) => {
     setCurrentUser(user);
@@ -99,17 +131,57 @@ const App: React.FC = () => {
     await performSave(newCourses);
   };
 
-  const handleDeleteCourse = async (course: Course) => {
-    if (!currentUser) return;
-    if (currentUser.role === 'GeneralUser' && course.createdBy === 'HR') {
-        alert("權限不足：您無法刪除由 HR 或管理者建立的課程資料。");
-        return;
-    }
-    if (window.confirm(`確定要刪除「${course.name}」這門課程嗎？`)) {
-      const newCourses = courses.filter(c => c.id !== course.id);
-      await performSave(newCourses);
+  // --- Batch Delete Logic ---
+
+  // Check if a specific course can be deleted by the current user
+  const canDeleteCourse = (course: Course) => {
+      if (!currentUser) return false;
+      // General users cannot delete HR-created courses
+      return !(currentUser.role === 'GeneralUser' && course.createdBy === 'HR');
+  };
+
+  const handleToggleSelect = (id: string) => {
+      const newSet = new Set(selectedCourseIds);
+      if (newSet.has(id)) {
+          newSet.delete(id);
+      } else {
+          newSet.add(id);
+      }
+      setSelectedCourseIds(newSet);
+  };
+
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.checked) {
+          // Select all visible courses that the user has permission to delete
+          const deletableIds = visibleCourses
+              .filter(c => canDeleteCourse(c))
+              .map(c => c.id);
+          setSelectedCourseIds(new Set(deletableIds));
+      } else {
+          setSelectedCourseIds(new Set());
+      }
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedCourseIds.size === 0) return;
+
+    if (window.confirm(`確定要刪除選取的 ${selectedCourseIds.size} 筆課程嗎？此動作無法復原。`)) {
+      try {
+        const newCourses = courses.filter(c => !selectedCourseIds.has(c.id));
+        await performSave(newCourses);
+        setSelectedCourseIds(new Set()); // Clear selection
+      } catch (error) {
+        console.error("Delete failed:", error);
+        alert("刪除失敗，請稍後再試。");
+      }
     }
   };
+
+  // Determine "Select All" checkbox state
+  const deletableCoursesCount = visibleCourses.filter(c => canDeleteCourse(c)).length;
+  const isAllSelected = deletableCoursesCount > 0 && selectedCourseIds.size === deletableCoursesCount;
+  const isIndeterminate = selectedCourseIds.size > 0 && selectedCourseIds.size < deletableCoursesCount;
+
 
   const handleBatchImport = async (importedCourses: Course[]) => {
     const newCourses = [...courses, ...importedCourses];
@@ -276,7 +348,20 @@ const App: React.FC = () => {
                  {/* Show Add/Import for all users (Admin/HR/GeneralUser), provided they have permission to access the list view */}
                  {view !== 'users' && (
                      <>
+                        {/* Batch Delete Button - Visible when items selected */}
+                        {selectedCourseIds.size > 0 && (
+                             <button 
+                                type="button"
+                                onClick={handleBatchDelete}
+                                className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-md shadow-red-500/20 transition-all active:scale-95 font-medium text-sm animate-fade-in"
+                            >
+                                <svg className="pointer-events-none" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                                刪除 ({selectedCourseIds.size})
+                            </button>
+                        )}
+
                         <button 
+                            type="button"
                             onClick={() => setIsBatchImportOpen(true)}
                             className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-lg shadow-md shadow-slate-500/20 transition-all active:scale-95 font-medium text-sm"
                         >
@@ -284,6 +369,7 @@ const App: React.FC = () => {
                             整批匯入
                         </button>
                         <button 
+                            type="button"
                             onClick={() => { setEditingCourse(null); setIsFormOpen(true); }}
                             className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg shadow-md shadow-primary-500/20 transition-all active:scale-95 font-medium text-sm"
                         >
@@ -299,120 +385,164 @@ const App: React.FC = () => {
             {view === 'users' && currentUser.role === 'SystemAdmin' && <UserManagement />}
 
             {view === 'dashboard' && (
-                <>
-                    <div className="mb-4 text-sm text-slate-500 flex items-center gap-2">
-                        <span className="font-bold">目前檢視範圍：</span>
-                        {currentUser.role === 'SystemAdmin' ? '全部資料' : '僅限所屬權限之公司/單位'}
-                    </div>
-                    <Dashboard courses={visibleCourses} />
-                </>
+                <Dashboard courses={visibleCourses} />
             )}
             
             {view === 'list' && (
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden animate-fade-in">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase tracking-wider">
-                                    <th className="p-4 font-semibold">課程名稱</th>
-                                    <th className="p-4 font-semibold">單位</th>
-                                    <th className="p-4 font-semibold">日期/時間</th>
-                                    <th className="p-4 font-semibold">講師</th>
-                                    <th className="p-4 font-semibold text-center">人數 (預/實)</th>
-                                    <th className="p-4 font-semibold text-right">費用</th>
-                                    <th className="p-4 font-semibold text-center">滿意度</th>
-                                    <th className="p-4 font-semibold text-center">狀態</th>
-                                    <th className="p-4 font-semibold text-right">操作</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100 text-sm">
-                                {visibleCourses.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={9} className="p-8 text-center text-slate-400">
-                                            尚無可顯示的課程資料。
-                                            {courses.length > 0 && <span className="block text-xs mt-1">（您沒有權限查看現有的課程）</span>}
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    visibleCourses.map(course => (
-                                        <tr key={course.id} className="hover:bg-slate-50 transition-colors">
-                                            <td className="p-4">
-                                                <div className="font-semibold text-slate-800">{course.name}</div>
-                                                <div className="text-xs text-slate-500 mt-1 truncate max-w-[200px]">{course.objective}</div>
-                                            </td>
-                                            <td className="p-4">
-                                                <div className="text-slate-800 font-medium">{course.company || '-'}</div>
-                                                <div className="text-xs text-slate-500 mt-1">{course.department}</div>
-                                            </td>
-                                            <td className="p-4 text-slate-600">
-                                                <div>{course.startDate} {course.startDate !== course.endDate && `~ ${course.endDate}`}</div>
-                                                <div className="text-xs text-slate-400 mt-1">{course.time} ({course.duration}h)</div>
-                                            </td>
-                                            <td className="p-4">
-                                                <div className="text-slate-700">{course.instructor}</div>
-                                                <div className="text-xs text-slate-400">{course.instructorOrg}</div>
-                                            </td>
-                                            <td className="p-4 text-center">
-                                                <span className="text-slate-400">{course.expectedAttendees}</span>
-                                                <span className="mx-1 text-slate-300">/</span>
-                                                <span className={`font-medium ${course.actualAttendees > 0 ? 'text-primary-600' : 'text-slate-400'}`}>{course.actualAttendees}</span>
-                                            </td>
-                                            <td className="p-4 text-right text-slate-700 font-mono">
-                                                ${course.cost.toLocaleString()}
-                                            </td>
-                                            <td className="p-4 text-center">
-                                                {course.satisfaction > 0 ? (
-                                                     <div className="inline-flex items-center gap-1 px-2 py-1 rounded bg-amber-50 text-amber-600 font-bold">
-                                                        {course.satisfaction}
-                                                     </div>
-                                                ) : <span className="text-slate-300">-</span>}
-                                            </td>
-                                            <td className="p-4 text-center vertical-top">
-                                                <span className={`px-2 py-1 rounded-full text-xs font-medium border ${
-                                                    course.status === 'Completed' ? 'bg-green-50 text-green-600 border-green-100' :
-                                                    course.status === 'Cancelled' ? 'bg-red-50 text-red-600 border-red-100' :
-                                                    'bg-blue-50 text-blue-600 border-blue-100'
-                                                }`}>
-                                                    {course.status === 'Completed' ? '已完成' : course.status === 'Cancelled' ? '已取消' : '規劃中'}
-                                                </span>
-                                                {course.status === 'Cancelled' && course.cancellationReason && (
-                                                    <div className="text-xs text-red-500 mt-2 max-w-[120px] mx-auto break-words bg-red-50 p-1 rounded border border-red-100" title={course.cancellationReason}>
-                                                        {course.cancellationReason}
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="p-4 text-right">
-                                                <div className="flex justify-end gap-2">
-                                                    <button 
-                                                        onClick={() => { setEditingCourse(course); setIsFormOpen(true); }}
-                                                        className="p-2 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-                                                        title="編輯"
-                                                    >
-                                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
-                                                    </button>
-                                                    <button 
-                                                        onClick={() => handleDeleteCourse(course)}
-                                                        className={`p-2 rounded-lg transition-colors ${
-                                                            (currentUser.role === 'GeneralUser' && course.createdBy === 'HR') 
-                                                                ? 'text-slate-200 cursor-not-allowed' 
-                                                                : 'text-slate-400 hover:text-red-600 hover:bg-red-50'
-                                                        }`}
-                                                        title={
-                                                            (currentUser.role === 'GeneralUser' && course.createdBy === 'HR')
-                                                            ? "您無法刪除管理者建立的課程"
-                                                            : "刪除"
-                                                        }
-                                                    >
-                                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                <div className="space-y-8 animate-fade-in">
+                    {visibleCourses.length === 0 ? (
+                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center text-slate-400">
+                             尚無可顯示的課程資料。
+                             {courses.length > 0 && <span className="block text-xs mt-1">（您沒有權限查看現有的課程）</span>}
+                        </div>
+                    ) : (
+                        groupedCourses.map(group => (
+                            <div key={group.month} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                                <div className="bg-slate-50 px-6 py-3 border-b border-slate-200 flex items-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary-600"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+                                    <h3 className="font-bold text-slate-700">{group.month} 月份課程</h3>
+                                    <span className="text-xs text-slate-400 font-normal">({group.courses.length} 堂)</span>
+                                </div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr className="bg-white text-slate-500 text-xs uppercase tracking-wider border-b border-slate-100">
+                                                <th className="p-4 w-10 text-center">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={isAllSelected}
+                                                        ref={input => { if (input) input.indeterminate = isIndeterminate; }}
+                                                        onChange={handleSelectAll}
+                                                        className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                                                        title="全選 (僅限有權限刪除的項目)"
+                                                    />
+                                                </th>
+                                                <th className="p-4 font-semibold min-w-[200px]">課程名稱</th>
+                                                <th className="p-4 font-semibold w-24">類型</th>
+                                                <th className="p-4 font-semibold">單位</th>
+                                                <th className="p-4 font-semibold min-w-[140px]">日期/時間</th>
+                                                <th className="p-4 font-semibold">講師</th>
+                                                <th className="p-4 font-semibold text-center">人數 (預/實)</th>
+                                                <th className="p-4 font-semibold text-right">費用</th>
+                                                <th className="p-4 font-semibold text-center">滿意度</th>
+                                                <th className="p-4 font-semibold text-center">狀態</th>
+                                                <th className="p-4 font-semibold text-right">操作</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-50 text-sm">
+                                            {group.courses.map(course => {
+                                                const canDelete = canDeleteCourse(course);
+                                                
+                                                return (
+                                                <tr 
+                                                    key={course.id} 
+                                                    onClick={() => canDelete && handleToggleSelect(course.id)}
+                                                    className={`transition-colors border-b border-slate-50 last:border-0 ${
+                                                        canDelete ? 'cursor-pointer' : ''
+                                                    } ${
+                                                        selectedCourseIds.has(course.id) ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-slate-50'
+                                                    }`}
+                                                >
+                                                    <td className="p-4 text-center">
+                                                        {canDelete && (
+                                                            <input 
+                                                                type="checkbox"
+                                                                checked={selectedCourseIds.has(course.id)}
+                                                                onChange={() => handleToggleSelect(course.id)}
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                                                            />
+                                                        )}
+                                                    </td>
+                                                    <td className="p-4">
+                                                        <div className="font-semibold text-slate-800">{course.name}</div>
+                                                        <div className="text-xs text-slate-500 mt-1 truncate max-w-[200px]">{course.objective}</div>
+                                                        {course.trainingType === 'External' && course.trainees && (
+                                                            <div className="mt-2 flex flex-wrap gap-1">
+                                                                <span className="text-[10px] text-slate-400 mr-1">受訓人員:</span>
+                                                                {course.trainees.split(/[,|，、\n]/).filter(t => t.trim()).map((t, i) => (
+                                                                    <span key={i} className="inline-block px-1.5 py-0.5 bg-indigo-50 text-indigo-600 rounded text-[10px]">
+                                                                        {t.trim()}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td className="p-4">
+                                                        <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                                                            course.trainingType === 'External' 
+                                                            ? 'bg-purple-50 text-purple-700 border border-purple-100' 
+                                                            : 'bg-slate-100 text-slate-600 border border-slate-200'
+                                                        }`}>
+                                                            {course.trainingType === 'External' ? '外訓' : '內訓'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-4">
+                                                        <div className="text-slate-800 font-medium">{course.company || '-'}</div>
+                                                        <div className="text-xs text-slate-500 mt-1">{course.department}</div>
+                                                    </td>
+                                                    <td className="p-4 text-slate-600">
+                                                        <div>{course.startDate} {course.startDate !== course.endDate && `~ ${course.endDate.substring(5)}`}</div>
+                                                        <div className="text-xs text-slate-400 mt-1">{course.time} ({course.duration}h)</div>
+                                                    </td>
+                                                    <td className="p-4">
+                                                        <div className="text-slate-700">{course.instructor}</div>
+                                                        <div className="text-xs text-slate-400">{course.instructorOrg}</div>
+                                                    </td>
+                                                    <td className="p-4 text-center">
+                                                        <span className="text-slate-400">{course.expectedAttendees}</span>
+                                                        <span className="mx-1 text-slate-300">/</span>
+                                                        <span className={`font-medium ${course.actualAttendees > 0 ? 'text-primary-600' : 'text-slate-400'}`}>{course.actualAttendees}</span>
+                                                    </td>
+                                                    <td className="p-4 text-right text-slate-700 font-mono">
+                                                        ${course.cost.toLocaleString()}
+                                                    </td>
+                                                    <td className="p-4 text-center">
+                                                        {course.satisfaction > 0 ? (
+                                                            <div className="inline-flex items-center gap-1 px-2 py-1 rounded bg-amber-50 text-amber-600 font-bold">
+                                                                {course.satisfaction}
+                                                            </div>
+                                                        ) : <span className="text-slate-300">-</span>}
+                                                    </td>
+                                                    <td className="p-4 text-center vertical-top">
+                                                        <span className={`px-2 py-1 rounded-full text-xs font-medium border ${
+                                                            course.status === 'Completed' ? 'bg-green-50 text-green-600 border-green-100' :
+                                                            course.status === 'Cancelled' ? 'bg-red-50 text-red-600 border-red-100' :
+                                                            'bg-blue-50 text-blue-600 border-blue-100'
+                                                        }`}>
+                                                            {course.status === 'Completed' ? '已完成' : course.status === 'Cancelled' ? '已取消' : '規劃中'}
+                                                        </span>
+                                                        {course.status === 'Cancelled' && course.cancellationReason && (
+                                                            <div className="text-xs text-red-500 mt-2 max-w-[120px] mx-auto break-words bg-red-50 p-1 rounded border border-red-100" title={course.cancellationReason}>
+                                                                {course.cancellationReason}
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td className="p-4 text-right">
+                                                        <div className="flex justify-end gap-2">
+                                                            <button 
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setEditingCourse(course); 
+                                                                    setIsFormOpen(true);
+                                                                }}
+                                                                className="p-2 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                                                                title="編輯"
+                                                            >
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        ))
+                    )}
                 </div>
             )}
         </div>
@@ -456,6 +586,7 @@ const App: React.FC = () => {
 
                   <div className="flex justify-between gap-2 border-t border-slate-100 pt-4 mt-6">
                       <button 
+                        type="button"
                         onClick={handleTestConnection}
                         disabled={isTestingConnection}
                         className="px-4 py-2 text-indigo-600 hover:bg-indigo-50 rounded-lg text-sm font-medium flex items-center gap-2"
@@ -470,8 +601,8 @@ const App: React.FC = () => {
                          )}
                       </button>
                       <div className="flex gap-2">
-                          <button onClick={() => setIsSettingsOpen(false)} className="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-lg text-sm">取消</button>
-                          <button onClick={handleSaveSettings} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm">儲存</button>
+                          <button type="button" onClick={() => setIsSettingsOpen(false)} className="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-lg text-sm">取消</button>
+                          <button type="button" onClick={handleSaveSettings} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm">儲存</button>
                       </div>
                   </div>
               </div>

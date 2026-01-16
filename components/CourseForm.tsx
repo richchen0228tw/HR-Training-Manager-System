@@ -28,7 +28,9 @@ const emptyCourse: Course = {
   satisfaction: 0,
   status: 'Planned',
   cancellationReason: '',
-  createdBy: 'HR'
+  createdBy: 'HR',
+  trainingType: 'Internal',
+  trainees: ''
 };
 
 export const CourseForm: React.FC<CourseFormProps> = ({ isOpen, onClose, onSubmit, initialData, currentUser }) => {
@@ -70,7 +72,9 @@ export const CourseForm: React.FC<CourseFormProps> = ({ isOpen, onClose, onSubmi
         setFormData({
             ...emptyCourse,
             ...initialData,
-            cancellationReason: initialData.cancellationReason || ''
+            cancellationReason: initialData.cancellationReason || '',
+            trainingType: initialData.trainingType || 'Internal',
+            trainees: initialData.trainees || ''
         });
         // Load allowed departments for the existing company
         if (initialData.company) {
@@ -150,6 +154,34 @@ export const CourseForm: React.FC<CourseFormProps> = ({ isOpen, onClose, onSubmi
               placeholder="例如：2024 年度資訊安全教育訓練"
             />
           </div>
+
+          <div>
+             <label className="block text-sm font-medium text-slate-700 mb-1">訓練類型</label>
+             <select
+                name="trainingType"
+                value={formData.trainingType}
+                onChange={handleChange}
+                className={inputClass}
+             >
+                 <option value="Internal">內訓 (Internal)</option>
+                 <option value="External">外訓 (External)</option>
+             </select>
+          </div>
+
+          {/* Conditional Trainees Input */}
+          {formData.trainingType === 'External' && (
+             <div className="col-span-1 md:col-span-2 animate-fade-in">
+                <label className="block text-sm font-medium text-primary-700 mb-1">受訓名單 (外訓必填)</label>
+                <textarea
+                  name="trainees"
+                  value={formData.trainees || ''}
+                  onChange={handleChange}
+                  rows={2}
+                  className={`${inputClass} border-primary-300 bg-primary-50 focus:ring-primary-500`}
+                  placeholder="請輸入參加人員姓名，多人請用逗號分隔..."
+                />
+             </div>
+          )}
 
           <div>
              <label className="block text-sm font-medium text-slate-700 mb-1">公司別</label>

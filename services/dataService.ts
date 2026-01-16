@@ -27,7 +27,8 @@ const MOCK_DATA: Course[] = [
     cost: 15000,
     satisfaction: 4.6,
     status: 'Completed',
-    createdBy: 'HR'
+    createdBy: 'HR',
+    trainingType: 'Internal'
   },
   {
     id: '2',
@@ -46,7 +47,9 @@ const MOCK_DATA: Course[] = [
     cost: 25000,
     satisfaction: 0,
     status: 'Planned',
-    createdBy: 'HR'
+    createdBy: 'HR',
+    trainingType: 'External',
+    trainees: '陳經理, 林副理, 王襄理'
   },
     {
     id: '3',
@@ -65,7 +68,8 @@ const MOCK_DATA: Course[] = [
     cost: 0,
     satisfaction: 0,
     status: 'Planned',
-    createdBy: 'User'
+    createdBy: 'User',
+    trainingType: 'Internal'
   }
 ];
 

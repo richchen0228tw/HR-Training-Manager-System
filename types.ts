@@ -18,6 +18,8 @@ export interface Course {
   status: 'Planned' | 'Completed' | 'Cancelled'; // 執行情形
   cancellationReason?: string; // 取消原因
   createdBy: 'HR' | 'User';
+  trainingType?: 'Internal' | 'External'; // 訓練類型：內訓、外訓
+  trainees?: string; // 受訓名單 (外訓用)
 }
 
 export interface DashboardStats {

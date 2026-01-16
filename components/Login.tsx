@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { login } from '../services/dataService';
+import { login, fetchUsers, saveUsers } from '../services/dataService';
 import { User } from '../types';
 
 interface LoginProps {
@@ -13,6 +13,11 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [error, setError] = useState('');
   const [showForgot, setShowForgot] = useState(false);
 
+  // Forgot Password States
+  const [forgotUsername, setForgotUsername] = useState('');
+  const [forgotMessage, setForgotMessage] = useState('');
+  const [isResetting, setIsResetting] = useState(false);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const user = login(username, password);
@@ -21,6 +26,32 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     } else {
       setError('帳號或密碼錯誤 (預設 admin/123)');
     }
+  };
+
+  const handleForgotPassword = (e: React.FormEvent) => {
+      e.preventDefault();
+      setIsResetting(true);
+      setForgotMessage('');
+      
+      setTimeout(() => {
+          const allUsers = fetchUsers();
+          const targetUser = allUsers.find(u => u.username === forgotUsername);
+          
+          if (targetUser) {
+              // Mock Reset Password Logic
+              const updatedUsers = allUsers.map(u => {
+                  if (u.id === targetUser.id) {
+                      return { ...u, password: '123', mustChangePassword: true };
+                  }
+                  return u;
+              });
+              saveUsers(updatedUsers);
+              setForgotMessage(`✅ 已發送重置信件！\n為了方便測試，密碼已重置為「123」。\n請使用新密碼登入並修改。`);
+          } else {
+              setForgotMessage('❌ 找不到此帳號，請確認輸入是否正確。');
+          }
+          setIsResetting(false);
+      }, 1000);
   };
 
   return (
@@ -62,7 +93,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
           <div className="flex justify-end">
               <button 
                 type="button" 
-                onClick={() => setShowForgot(true)}
+                onClick={() => { setShowForgot(true); setForgotMessage(''); setForgotUsername(''); }}
                 className="text-xs text-primary-600 hover:text-primary-800 hover:underline"
               >
                   忘記密碼？
@@ -92,16 +123,45 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                       <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
                   </div>
                   <h3 className="text-lg font-bold text-center text-slate-800 mb-2">忘記密碼</h3>
-                  <p className="text-sm text-slate-600 text-center mb-6">
-                      此為演示系統，尚未串接郵件伺服器。<br/><br/>
-                      請聯繫<span className="font-bold text-slate-900">系統管理員</span>協助重置。<br/>
-                      (預設管理員帳號: admin)
-                  </p>
+                  
+                  {!forgotMessage.includes('✅') ? (
+                      <form onSubmit={handleForgotPassword} className="space-y-4">
+                          <p className="text-sm text-slate-600 text-center mb-4">
+                              請輸入您的帳號，系統將寄送重置密碼信件給您。
+                          </p>
+                          <input 
+                              type="text" 
+                              value={forgotUsername}
+                              onChange={(e) => setForgotUsername(e.target.value)}
+                              className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-amber-500 outline-none"
+                              placeholder="請輸入帳號"
+                              required
+                          />
+                           <button 
+                            type="submit"
+                            disabled={isResetting}
+                            className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                          >
+                              {isResetting ? '處理中...' : '重置密碼'}
+                          </button>
+                      </form>
+                  ) : (
+                      <div className="bg-green-50 text-green-700 p-4 rounded-lg text-sm whitespace-pre-line text-center mb-4 border border-green-100">
+                          {forgotMessage}
+                      </div>
+                  )}
+
+                  {forgotMessage.includes('❌') && (
+                       <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm text-center mb-4">
+                           {forgotMessage}
+                       </div>
+                  )}
+
                   <button 
                     onClick={() => setShowForgot(false)}
-                    className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors"
+                    className="w-full py-2 mt-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors"
                   >
-                      關閉
+                      {forgotMessage.includes('✅') ? '返回登入' : '取消'}
                   </button>
               </div>
           </div>

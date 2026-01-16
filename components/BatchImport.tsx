@@ -9,8 +9,8 @@ interface BatchImportProps {
 }
 
 // Helper to provide a template
-const CSV_HEADER = "課程名稱,公司別,部門/單位,課程目的,開始日期,結束日期,時間,時數,預計人數,講師,講師單位,費用";
-const SAMPLE_DATA = "Excel進階實戰,神資,600-數位科技事業群,提升資料處理效率,2024-01-15,2024-01-15,09:00-17:00,7,30,陳大文,數據中心,12000\n溝通技巧,新達,Z10-統合通訊處,強化跨部門溝通,2024-01-20,2024-01-20,13:30-16:30,3,20,林小美,HR,5000";
+const CSV_HEADER = "課程名稱,公司別,部門/單位,課程目的,開始日期,結束日期,時間,時數,預計人數,講師,講師單位,費用,訓練類型(內訓/外訓),受訓名單";
+const SAMPLE_DATA = "Excel進階實戰,神資,600-數位科技事業群,提升資料處理效率,2024-01-15,2024-01-15,09:00-17:00,7,30,陳大文,數據中心,12000,內訓,\n溝通技巧,新達,Z10-統合通訊處,強化跨部門溝通,2024-01-20,2024-01-20,13:30-16:30,3,20,林小美,HR,5000,外訓,王小明|李大偉";
 
 export const BatchImport: React.FC<BatchImportProps> = ({ onImport, onCancel, currentUser }) => {
   const [inputText, setInputText] = useState('');
@@ -67,6 +67,9 @@ export const BatchImport: React.FC<BatchImportProps> = ({ onImport, onCancel, cu
         // We expect at least a name and date
         if (cols.length < 3) continue;
 
+        const trainingTypeStr = cols[12] || '內訓';
+        const isExternal = trainingTypeStr.includes('外訓') || trainingTypeStr.toLowerCase().includes('external');
+
         const course: Course = {
           id: crypto.randomUUID(),
           name: cols[0] || '未命名課程',
@@ -81,6 +84,8 @@ export const BatchImport: React.FC<BatchImportProps> = ({ onImport, onCancel, cu
           instructor: cols[9] || '',
           instructorOrg: cols[10] || '',
           cost: parseInt(cols[11]) || 0,
+          trainingType: isExternal ? 'External' : 'Internal',
+          trainees: cols[13] ? cols[13].replace(/\|/g, ',') : '', // Support pipe or simple text
           actualAttendees: 0,
           satisfaction: 0,
           status: 'Planned',
@@ -188,9 +193,9 @@ export const BatchImport: React.FC<BatchImportProps> = ({ onImport, onCancel, cu
                   <thead className="bg-slate-50 text-slate-500 font-medium">
                     <tr>
                       <th className="p-3">課程名稱</th>
+                      <th className="p-3">類型</th>
                       <th className="p-3">公司</th>
                       <th className="p-3">日期</th>
-                      <th className="p-3">講師</th>
                       <th className="p-3 text-right">費用</th>
                     </tr>
                   </thead>
@@ -198,9 +203,9 @@ export const BatchImport: React.FC<BatchImportProps> = ({ onImport, onCancel, cu
                     {previewData.map((course, idx) => (
                       <tr key={idx}>
                         <td className="p-3">{course.name}</td>
+                        <td className="p-3">{course.trainingType === 'External' ? '外訓' : '內訓'}</td>
                         <td className="p-3">{course.company}</td>
                         <td className="p-3">{course.startDate}</td>
-                        <td className="p-3">{course.instructor}</td>
                         <td className="p-3 text-right">{course.cost}</td>
                       </tr>
                     ))}

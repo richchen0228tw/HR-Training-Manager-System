@@ -125,7 +125,7 @@ export const UserManagement: React.FC = () => {
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 animate-fade-in">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-lg font-bold text-slate-800">{currentUser.id === 'admin' ? '編輯使用者 (admin)' : '使用者設定'}</h3>
-                <button onClick={() => setIsEditing(false)} className="text-slate-400 hover:text-slate-600">
+                <button type="button" onClick={() => setIsEditing(false)} className="text-slate-400 hover:text-slate-600">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
                 </button>
               </div>
@@ -196,7 +196,7 @@ export const UserManagement: React.FC = () => {
                   <div className="border-t border-slate-100 pt-6">
                       <div className="flex justify-between items-center mb-4">
                           <h4 className="font-bold text-slate-700">資料存取權限 (Data Access)</h4>
-                          <button onClick={addPermission} className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1">
+                          <button type="button" onClick={addPermission} className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1">
                               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="8" x2="16" y1="12" y2="12"/></svg>
                               新增公司權限
                           </button>
@@ -207,7 +207,7 @@ export const UserManagement: React.FC = () => {
                           
                           {currentUser.permissions.map((perm, idx) => (
                               <div key={idx} className="bg-slate-50 border border-slate-200 rounded-lg p-4 relative">
-                                  <button onClick={() => removePermission(idx)} className="absolute top-2 right-2 text-slate-400 hover:text-red-500">
+                                  <button type="button" onClick={() => removePermission(idx)} className="absolute top-2 right-2 text-slate-400 hover:text-red-500">
                                       <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
                                   </button>
                                   
@@ -261,8 +261,8 @@ export const UserManagement: React.FC = () => {
               )}
 
               <div className="flex justify-end gap-3 mt-8">
-                  <button onClick={() => setIsEditing(false)} className="px-4 py-2 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors">取消</button>
-                  <button onClick={handleSave} className="px-4 py-2 rounded-lg bg-primary-600 text-white hover:bg-primary-700 shadow-md transition-colors">儲存設定</button>
+                  <button type="button" onClick={() => setIsEditing(false)} className="px-4 py-2 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors">取消</button>
+                  <button type="button" onClick={handleSave} className="px-4 py-2 rounded-lg bg-primary-600 text-white hover:bg-primary-700 shadow-md transition-colors">儲存設定</button>
               </div>
           </div>
       );
@@ -273,7 +273,7 @@ export const UserManagement: React.FC = () => {
        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
              <h3 className="text-lg font-bold text-slate-800">使用者列表</h3>
-             <button onClick={handleCreate} className="px-4 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-2">
+             <button type="button" onClick={handleCreate} className="px-4 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
                 新增使用者
              </button>
@@ -325,9 +325,9 @@ export const UserManagement: React.FC = () => {
                               )}
                           </td>
                           <td className="p-4 text-right">
-                              <button onClick={() => handleEdit(user)} className="text-primary-600 hover:text-primary-800 mr-3">編輯</button>
+                              <button type="button" onClick={() => handleEdit(user)} className="text-primary-600 hover:text-primary-800 mr-3">編輯</button>
                               {user.id !== 'admin' && (
-                                  <button onClick={() => handleDelete(user.id)} className="text-red-400 hover:text-red-600">刪除</button>
+                                  <button type="button" onClick={() => handleDelete(user.id)} className="text-red-400 hover:text-red-600">刪除</button>
                               )}
                           </td>
                       </tr>

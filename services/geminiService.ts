@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { Course } from "../types";
 
@@ -23,6 +24,8 @@ export const parseTrainingDataWithGemini = async (textInput: string): Promise<Pa
     - instructor (string)
     - instructorOrg (string)
     - cost (number)
+    - trainingType (string, either "Internal" or "External". Infer based on context. "內訓"->Internal, "外訓"->External)
+    - trainees (string, if External, list the names of people attending, comma separated)
     
     If a field is missing, make a reasonable guess or leave it as an empty string/0 based on context.
     For 'cost', strictly extract the number.
@@ -54,6 +57,8 @@ export const parseTrainingDataWithGemini = async (textInput: string): Promise<Pa
               instructor: { type: Type.STRING },
               instructorOrg: { type: Type.STRING },
               cost: { type: Type.NUMBER },
+              trainingType: { type: Type.STRING, enum: ["Internal", "External"] },
+              trainees: { type: Type.STRING },
             },
           },
         },
@@ -72,7 +77,8 @@ export const parseTrainingDataWithGemini = async (textInput: string): Promise<Pa
       actualAttendees: 0,
       satisfaction: 0,
       status: 'Planned',
-      createdBy: 'HR'
+      createdBy: 'HR',
+      trainingType: item.trainingType || 'Internal'
     }));
 
   } catch (error) {
